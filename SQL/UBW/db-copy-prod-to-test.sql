@@ -10,6 +10,15 @@ DECLARE @DataPath NVARCHAR(255) = 'F:\MSSQL15.MSSQLSERVER\MSSQL\Data\agrtest_Dat
 DECLARE @LogPath NVARCHAR(255) = 'G:\MSSQL15.MSSQLSERVER\MSSQL\Log\agrtest_Log.ldf'
 
 -- List of backup files
+-- Generate with dir /b
+-- or
+-- Get-ChildItem -Path "C:\Path\To\Backups" -File |
+--    Sort-Object Name |
+--    ForEach-Object {
+--        $type = if ($_.Extension -eq ".bak") { "FULL" } else { "LOG" }
+--        "('$_', '$type'),"
+--    }
+
 DECLARE @BackupFiles TABLE (FileName NVARCHAR(255), FileType NVARCHAR(10)) -- FileType can be 'FULL' or 'LOG'
 
 INSERT INTO @BackupFiles (FileName, FileType)
