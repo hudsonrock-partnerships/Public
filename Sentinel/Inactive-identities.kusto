@@ -1,0 +1,57 @@
+let watchlist = (_GetWatchlist('exempt_inactive_accounts') | project UserId); 
+// Combine both interactive and non-interactive sign-ins
+let AllSignIns = union
+(
+    SigninLogs 
+    | where TimeGenerated > ago(365d) 
+    | project TimeGenerated, UserDisplayName, UserPrincipalName, UserId, IsInteractive, SignInType = "Interactive"
+),
+(
+    AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(365d)
+    | project TimeGenerated, UserDisplayName, UserPrincipalName, UserId, IsInteractive = false, SignInType = "NonInteractive"
+);
+AllSignIns
+| sort by TimeGenerated desc  
+| project TimeGenerated, UserDisplayName, UserPrincipalName, UserId, IsInteractive, SignInType
+| project-rename SignInTimeGenerated = TimeGenerated 
+| join kind=fullouter  ( 
+IdentityInfo 
+| summarize arg_max(TimeGenerated, *) by AccountObjectId 
+| project AccountObjectId, IsAccountEnabled, Department, Manager, SourceSystem
+) 
+on $left.UserId == $right.AccountObjectId 
+| summarize arg_max(SignInTimeGenerated, *) by UserId 
+| project 
+SignInTimeGenerated, 
+UserDisplayName, 
+UserPrincipalName, 
+Department, 
+Manager, 
+IsAccountEnabled, 
+IsInteractive,
+SignInType,
+UserId, 
+AccountObjectId,
+SourceSystem
+| sort by 
+SignInTimeGenerated asc, 
+UserDisplayName asc, 
+UserPrincipalName, 
+IsAccountEnabled, 
+IsInteractive,
+SignInType,
+UserId, 
+AccountObjectId,
+SourceSystem
+| where IsAccountEnabled == true 
+// 
+//  Added due to potentially inactive admin for FOCI monitoring 
+// 
+| where UserPrincipalName !contains "admin" 
+// 
+//  Change "@peakinfosec" to reflect the organization's tenant/domain name 
+// 
+| where UserPrincipalName contains "@tbdvox.com" 
+| where SignInTimeGenerated < ago(90d) 
+| where UserId !in~ (watchlist)
